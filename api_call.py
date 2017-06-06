@@ -50,8 +50,8 @@ def GetConfig(user_path, TokenURI):
     # Obtain tokens from Authorization code
     usr_f = open(user_path, 'r')
     for line in usr_f.readlines():
-        if 'auth_code' in line.split('=')[0]: # Authorization code
-            auth_code = line.split('=')[1].strip()
+        if 'auth_code' in line.split('=')[0]:
+            auth_code = line.split('=')[1].strip() # Authorization code
 
     # Data payload (query parameters)
     uri_payload = {'code': auth_code,
@@ -61,6 +61,7 @@ def GetConfig(user_path, TokenURI):
 
     BodyURLEncoded = urllib.urlencode(uri_payload)  # encode dictionary in form of POST request URI
 
+    # URL request header
     hdr = {'Authorization': 'Basic %s' % 'MjI4SzI5OjQ2MzE4ZDIyMGQ5Y2JmNzczOGQ2ZTk5MTdmYTY2NDI4',
            'Content-Type': 'application/x-www-form-urlencoded'}
 
@@ -75,7 +76,7 @@ def GetConfig(user_path, TokenURI):
 
         FullResponse = response.read()  # output
 
-        # Convert response object to dictionary/hashable
+        # Convert response object to dictionary
         json_response = json.loads(FullResponse.decode('utf-8'))
         AccToken = str(json_response['access_token'])
         RefToken = str(json_response['refresh_token'])
@@ -122,21 +123,25 @@ def GetNewAccessToken(TokenURI, RefToken):
     :param RefToken: Refresh token
     :return: None
     """
-    BodyText = {'grant_type' : 'refresh_token',
+    # Data payload (Refresh token)
+    payload = {'grant_type' : 'refresh_token',
               'refresh_token' : RefToken}
-    BodyURLEncoded = urllib.urlencode(BodyText)
+    BodyURLEncoded = urllib.urlencode(payload)
 
     #Start the request
     token_request = urllib2.Request(TokenURI,BodyURLEncoded)
 
+    # Add header to request
     token_request.add_header('Authorization', 'Basic %s' % ('MjI4SzI5OjQ2MzE4ZDIyMGQ5Y2JmNzczOGQ2ZTk5MTdmYTY2NDI4'))
                              # base64.b64encode(OAuthTwoClientID + ":" + ClientOrConsumerSecret))
     token_request.add_header('Content-Type', 'application/x-www-form-urlencoded')
 
     #Fire off the request
+    context = ssl._create_unverified_context()  # development - bypass SSL certs
+
     try:
 
-        token_response = urllib2.urlopen(token_request)
+        token_response = urllib2.urlopen(token_request, context=context)
         FullResponse = token_response.read()
         json_response = json.loads(FullResponse)
 
@@ -155,7 +160,7 @@ def MakeAPICall(URL, TokenURI, AccToken,RefToken):
     #Start the request
     request = urllib2.Request(URL) # relies on Access token for ID
 
-    #Add the access token in the header
+    #Add Access token in header
     request.add_header('Authorization', 'Bearer ' + AccToken)
 
     #Fire off the request
@@ -165,14 +170,16 @@ def MakeAPICall(URL, TokenURI, AccToken,RefToken):
         response = urllib2.urlopen(request, context=context)
         FullResponse = response.read()
 
-        json_response = json.loads(FullResponse)
+        json_response = json.loads(FullResponse) # response in JSON format
 
+        # client to access Fitbit information
         client_key, client_secret = GetClient()
         client = fitbit.Fitbit(client_id=client_key,
                                client_secret=client_secret,
                                access_token=AccToken,
                                refresh_token=RefToken)
         return (True, json_response, client)
+
     #Catch errors (e.g. A 401 error that signifies the need for a new access token)
     except urllib2.URLError as e:
         print "HTTP error: ", str(e.code)
@@ -185,7 +192,6 @@ def MakeAPICall(URL, TokenURI, AccToken,RefToken):
 
 
 if __name__ == '__main__':
-
     # Directory of Users
     head_path = os.path.split(os.path.abspath(__file__))[0]
     user_path = os.path.join(head_path, 'users')

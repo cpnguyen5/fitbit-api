@@ -3,6 +3,12 @@ import urllib2
 import urllib
 import ssl
 import json
+import os
+
+
+#Fitbit URIs
+TokenURI = "https://api.fitbit.com/oauth2/token" #Access/Refresh Token Request
+AuthURI = "https://www.fitbit.com/oauth2/authorize" # Authorization
 
 #read & record user params (consumer key & secret)
 f = open('consumer.txt', 'r')
@@ -11,18 +17,23 @@ for line in f.readlines():
         c_key = line.split('=')[1].strip()
     elif 'consumer_secret' in line.split('=')[0]:
         c_secret = line.split('=')[1].strip()
-    # elif 'access_token' in line.split('=')[0]:
-    #     access_t = line.split('=')[1].strip()
-    # elif 'refresh_token' in line.split('=')[0]:
-    #     refresh_t = line.split('=')[1].strip()
+f.close()
+
+# Directory of Users
+head_path = os.path.split(os.path.abspath(__file__))[0]
+user_path = os.path.join(head_path, 'users')
+user_lstdir = os.listdir(user_path)  # list of user directories
+
+# User1 tokens
+usr1_f = open(os.path.join(user_path, 'user1.txt'), 'r')
+for line in usr1_f.readlines():
+    if 'access_token' in line.split('=')[0]:
+        access_t = line.split('=')[1].strip()
+    elif 'refresh_token' in line.split('=')[0]:
+        refresh_t = line.split('=')[1].strip()
     elif 'auth_code' in line.split('=')[0]:
         auth_code = line.split('=')[1].strip()
 
-f.close()
-
-#Fitbit URIs
-TokenURI = "https://api.fitbit.com/oauth2/token" #Access/Refresh Token Request
-AuthURI = "https://www.fitbit.com/oauth2/authorize" # Authorization
 
 # Data payload (query parameters)
 BodyText = {'code' : auth_code,
@@ -51,7 +62,8 @@ try:
 
   # Convert response object to dictionary/hashable
   json_response = json.loads(FullResponse.decode('utf-8'))
-  print json_response['access_token']
+  AccToken = str(json_response['access_token'])
+  RefToken = str(json_response['refresh_token'])
 
 except urllib2.URLError as e:
   print e.code

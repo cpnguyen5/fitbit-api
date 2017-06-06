@@ -2,7 +2,7 @@ import base64
 import urllib2
 import urllib
 import ssl
-
+import json
 
 #read & record user params (consumer key & secret)
 f = open('consumer.txt', 'r')
@@ -11,10 +11,10 @@ for line in f.readlines():
         c_key = line.split('=')[1].strip()
     elif 'consumer_secret' in line.split('=')[0]:
         c_secret = line.split('=')[1].strip()
-    elif 'access_token' in line.split('=')[0]:
-        access_t = line.split('=')[1].strip()
-    elif 'refresh_token' in line.split('=')[0]:
-        refresh_t = line.split('=')[1].strip()
+    # elif 'access_token' in line.split('=')[0]:
+    #     access_t = line.split('=')[1].strip()
+    # elif 'refresh_token' in line.split('=')[0]:
+    #     refresh_t = line.split('=')[1].strip()
     elif 'auth_code' in line.split('=')[0]:
         auth_code = line.split('=')[1].strip()
 
@@ -47,10 +47,12 @@ context =  ssl._create_unverified_context() # development - bypass SSL certs
 try:
   response = urllib2.urlopen(request, context=context)
 
-  FullResponse = response.read()
+  FullResponse = response.read() # output
 
-  print "Output: " + FullResponse
-  accessToken = FullResponse['access_token']
+  # Convert response object to dictionary/hashable
+  json_response = json.loads(FullResponse.decode('utf-8'))
+  print json_response['access_token']
+
 except urllib2.URLError as e:
   print e.code
   print e.read()

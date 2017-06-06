@@ -7,7 +7,6 @@ import ssl
 import fitbit
 
 
-
 def GetClient():
     """
     Obtain client ID and secret key.
@@ -17,36 +16,82 @@ def GetClient():
     f = open('consumer.txt', 'r')
     for line in f.readlines():
         if 'consumer_key' in line.split('=')[0]:
-            c_key = line.split('=')[1].strip()
+            client_key = line.split('=')[1].strip()
         elif 'consumer_secret' in line.split('=')[0]:
-            c_secret = line.split('=')[1].strip()
-    return c_key, c_secret
+            client_secret = line.split('=')[1].strip()
+    return client_key, client_secret
 
 
-def GetConfig(user_path):
+def GetConfig(user_path, TokenURI):
     """
     Obtain configuration (Access and Refresh tokens)
+    :param user_path: path to user credential txt file
+    :param TokenURI: token request URI
     :return: Access token, Refresh token
     """
-    tokens_f = open(user_path,'r') # user txt file
-    for line in tokens_f.readlines():
-        if 'access_token' in line.split('=')[0]:
-            AccToken = line.split('=')[1].strip()
-        elif 'refresh_token' in line.split('=')[0]:
-            RefToken = line.split('=')[1].strip()
-    tokens_f.close()
+    # Read tokens from file
+    # tokens_f = open(user_path,'r') # user txt file
+    # for line in tokens_f.readlines():
+    #     if 'access_token' in line.split('=')[0]:
+    #         AccToken = line.split('=')[1].strip()
+    #     elif 'refresh_token' in line.split('=')[0]:
+    #         RefToken = line.split('=')[1].strip()
+    # tokens_f.close()
+    #
+    # # strip newline
+    # if (AccToken.find("\n") != -1):
+    #     AccToken = AccToken.replace('\n', '')
+    # if (RefToken.find("\n") != -1):
+    #     RefToken = RefToken.replace('\n', '')
 
-    # strip newline
-    if (AccToken.find("\n") != -1):
-        AccToken = AccToken.replace('\n', '')
-    if (RefToken.find("\n") != -1):
-        RefToken = RefToken.replace('\n', '')
-    return AccToken, RefToken
+    # Obtain client credentials
+    c_key, c_secret = GetClient()
+
+    # Obtain tokens from Authorization code
+    usr_f = open(user_path, 'r')
+    for line in usr_f.readlines():
+        if 'auth_code' in line.split('=')[0]: # Authorization code
+            auth_code = line.split('=')[1].strip()
+
+    # Data payload (query parameters)
+    uri_payload = {'code': auth_code,
+                'redirect_uri': 'https://www.google.com/',
+                'clientId': c_key,  # OAuth2 client ID
+                'grant_type': 'authorization_code'}
+
+    BodyURLEncoded = urllib.urlencode(uri_payload)  # encode dictionary in form of POST request URI
+
+    hdr = {'Authorization': 'Basic %s' % 'MjI4SzI5OjQ2MzE4ZDIyMGQ5Y2JmNzczOGQ2ZTk5MTdmYTY2NDI4',
+           'Content-Type': 'application/x-www-form-urlencoded'}
+
+    # Start the request
+    request = urllib2.Request(TokenURI, BodyURLEncoded, headers=hdr)  # request
+
+    # Fire off the request
+    context = ssl._create_unverified_context()  # development - bypass SSL certs
+
+    try:
+        response = urllib2.urlopen(request, context=context)
+
+        FullResponse = response.read()  # output
+
+        # Convert response object to dictionary/hashable
+        json_response = json.loads(FullResponse.decode('utf-8'))
+        AccToken = str(json_response['access_token'])
+        RefToken = str(json_response['refresh_token'])
+
+        return AccToken, RefToken
+
+    except urllib2.URLError as e:
+        print e.code
+        print e.read()
+    return
 
 
 def WriteConfig(user_path, AccToken,RefToken):
     """
     Override configuration file with new Access and Refresh tokens
+    :param user_path: path to user credential txt file
     :param AccToken: Access token
     :param RefToken: Refresh tokens
     :return: None
@@ -73,7 +118,7 @@ def GetNewAccessToken(TokenURI, RefToken):
     """
     HTTP POST method to obtain/update new Access token using Refresh token.
 
-    :param TokenURI: token URI
+    :param TokenURI: token request URI
     :param RefToken: Refresh token
     :return: None
     """
@@ -106,10 +151,9 @@ def GetNewAccessToken(TokenURI, RefToken):
         print e.read()
 
 
-def MakeAPICall(user_path, URL, TokenURI, AccToken,RefToken):
+def MakeAPICall(URL, TokenURI, AccToken,RefToken):
     #Start the request
     request = urllib2.Request(URL) # relies on Access token for ID
-    # request = urllib2.Request(URL.replace('-','5RW7TT'))
 
     #Add the access token in the header
     request.add_header('Authorization', 'Bearer ' + AccToken)
@@ -147,28 +191,29 @@ if __name__ == '__main__':
     user_path = os.path.join(head_path, 'users')
     user_lstdir = os.listdir(user_path) # list of user directories
 
+    # Fitbit URIs
+    FitbitURI = "https://api.fitbit.com/1/user/-/profile.json"  # URL for API call (API endpoint)
+    TokenURI = "https://api.fitbit.com/oauth2/token"  # URL to refresh access token
+
     for user in user_lstdir:
         user_file = os.path.join(user_path, user)
-        # Fitbit URIs
-        FitbitURI = "https://api.fitbit.com/1/user/-/profile.json"  # URL for API call (API endpoint)
-        TokenURI = "https://api.fitbit.com/oauth2/token"  # URL to refresh access token
 
-        #Get the config (tokens)
-        AccessToken, RefreshToken = GetConfig(user_file)
+        #Get the user config (tokens)
+        AccessToken, RefreshToken = GetConfig(user_file, TokenURI)
 
         #API call
-        API_call, API_response, fitbit_client = MakeAPICall(user_file, FitbitURI, TokenURI, AccessToken, RefreshToken)
+        API_call, API_response, fitbit_client = MakeAPICall(FitbitURI, TokenURI, AccessToken, RefreshToken)
 
-        if API_call == True:
+        if API_call == True: # successful request
           print API_response
           # profile = fitbit_client.user_profile_get() # equivalent to API response
           # print profile
         else:
             if (API_response == "Refreshed"):
                 print "Refreshed the access token."
-                API_call, APIResponse, fitbit_client = MakeAPICall(user_file, FitbitURI, TokenURI, AccessToken, RefreshToken)
+                API_call, APIResponse, fitbit_client = MakeAPICall(FitbitURI, TokenURI, AccessToken, RefreshToken)
 
-                if API_call == True:
+                if API_call == True: # successful request after refresh token
                     print API_response
-            else:
+            else: # error
                 print "Error in API handling"

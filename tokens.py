@@ -27,11 +27,7 @@ user_lstdir = os.listdir(user_path)  # list of user directories
 # User1 tokens
 usr1_f = open(os.path.join(user_path, 'user1.txt'), 'r')
 for line in usr1_f.readlines():
-    if 'access_token' in line.split('=')[0]:
-        access_t = line.split('=')[1].strip()
-    elif 'refresh_token' in line.split('=')[0]:
-        refresh_t = line.split('=')[1].strip()
-    elif 'auth_code' in line.split('=')[0]:
+    if 'auth_code' in line.split('=')[0]:
         auth_code = line.split('=')[1].strip()
 
 
